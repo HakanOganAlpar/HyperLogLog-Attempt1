@@ -7,17 +7,10 @@
 #include "MurMurHash3.h"
 
 #include <math.h>
+#include <omp.h>
 
-
-HyperLogLog::HyperLogLog(unsigned int bitstaken1) { 
+HyperLogLog::HyperLogLog(unsigned int bitstaken1) {
 	bitsTaken = bitstaken1;
-	buckets= new int[pow(2, bitstaken1)];
-	
-
-	numBuckets = pow(2, bitstaken1);
-	for (int i = 0; i < numBuckets; i++) {
-		buckets[i] = 0;
-	}
 	cardinality = 0;
 }
 
@@ -25,9 +18,36 @@ HyperLogLog::HyperLogLog(unsigned int bitstaken1) {
 
 
 void HyperLogLog::Add(char param[], int dna_sequence_size) {
-	
-	for(int i =0;i<dna_sequence_size- windowSize +1 ; ++i)
+
+	int numThreads = 0;
+	buckets = new int*[4];
+
+	for (int i = 0; i < 4; ++i) {
+		buckets[i] = new int[8];
 		
+
+	}
+
+
+	for (int i = 0; i < 4; ++i) {
+		for (int j = 0; j < 8; ++j) {
+			buckets[i][j] = 0;
+		}
+	}
+
+
+#pragma omp parallel
+
+
+numBuckets = pow(2, bitsTaken);
+
+/*buckets[omp_get_thread_num()] = new int[numBuckets];
+for (int i = 0; i < numBuckets; i++) {
+	buckets[omp_get_thread_num()][i] = 0;
+}*/
+
+#pragma omp for 
+	for (int i = 0; i < dna_sequence_size - windowSize + 1; ++i)
 	{
 		char* p;
 		p = &param[i];
@@ -39,11 +59,11 @@ void HyperLogLog::Add(char param[], int dna_sequence_size) {
 		//unsigned int buckets;
 		int z = 0;
 		int counter = 0;
-		int size = (sizeof(unsigned int)*8);
+		int size = (sizeof(unsigned int) * 8);
 		unsigned int temp2 = (1 << 31);
-		while(z<size){
-			unsigned int temp =( hash << (bitsTaken));
-			
+		while (z < size) {
+			unsigned int temp = (hash << (bitsTaken));
+
 			if ((temp&temp2) == 0) {
 				counter++;
 			}
@@ -56,18 +76,27 @@ void HyperLogLog::Add(char param[], int dna_sequence_size) {
 			z++;
 		}
 
-	
-		if (buckets[index] < counter + 1) {
-			
-			buckets[index] = counter+1;
+
+		if (buckets[omp_get_thread_num()][index] < counter + 1) {
+
+			buckets[omp_get_thread_num()][index] = counter + 1;
+
+		}
+
 
 	}
-	
-	
+#pragma
+	int len = sizeof(buckets);
+	for (int i = 1; i < len; i++)
+	{
+
+		for (int j = 0; j < numBuckets; ++j) {
+			if (buckets[0][i] < buckets[j][i]) {
+				buckets[0][i] = buckets[j][i];
+			}
+		}
+
 	}
-
-	
-
 
 
 
@@ -76,20 +105,20 @@ void HyperLogLog::Add(char param[], int dna_sequence_size) {
 void HyperLogLog::Print() {
 	int i = 0;
 	while (i < numBuckets) {
-		cout << buckets[i]<< " ";
+		cout << buckets[0][i] << " ";
 		i++;
 	}
-	
-	cout <<endl<<cardinality;
+
+	cout << endl << cardinality;
 }
 
 void HyperLogLog::EstimationEQ() {
 	{
 		double sum = 0;
 		double estimation;
-		for (int i = 0; i<numBuckets; i++)
+		for (int i = 0; i < numBuckets; i++)
 		{
-			sum = sum + pow(2, -buckets[i]);
+			sum = sum + pow(2, -buckets[0][i]);
 		}
 
 		double alpha;
@@ -108,7 +137,7 @@ void HyperLogLog::EstimationEQ() {
 			break;
 		}
 		estimation = alpha*numBuckets*numBuckets*(1 / sum);
-		 cardinality += ceil(estimation);
+		cardinality += ceil(estimation);
 
 	}
 }

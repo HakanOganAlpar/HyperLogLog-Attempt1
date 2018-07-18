@@ -27,7 +27,7 @@ public:
 private:
 	unsigned int  numBuckets;
 	int hashSeed = HASHSEED;
-	int* buckets;
+	int** buckets;
 	int windowSize = WINDOWSIZE;
 	int bitsTaken;
 	unsigned int Encode(char * p);
